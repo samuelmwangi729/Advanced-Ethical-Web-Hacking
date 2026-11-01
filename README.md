@@ -252,7 +252,6 @@ Based on how easy/hard it was to exploit these vulnerabilities, the vulnerabilit
 |JWT Manipulation|**Critical**|Allows an attacker to easily escalate the privilege to a higher level account. eg. the admin|
 |Stored XSS|**High**|Leads to accounts compromise as indicated earlier|
 |Unrestricted File Upload|**Critical**|Allows an attacker to achieve RCE which might lead to a complete infrastructure takeover|
-|
 
 ## Business Implications of the Vulnerabilities
 These are the consequences faced bythe victim after these vulnerabilities have been exploited. These implications range from loss of clients trust to a total business closure. In this case, the business implications of these vulnerabilites can be summarized in the table below.
@@ -262,7 +261,6 @@ These are the consequences faced bythe victim after these vulnerabilities have b
 |JWT Manipulation| Exposes sensitive administrative interfaces leading to unauthorised malicious actions performed by attackers for their own gain. This leads to business loss in early stages|
 |Stored XSS|This leads to access to privileged accounts leading to unauthorised administrative activities|
 |Unrestricted File Uploads| Leads to RCE leading to customer data exposure, financial losses and even reputational damage|
-|
 
 ## Recommendations
 This writeup presents the ways in which the above identified and exploited vulnerabilities can be avoided and protect the web application. This writeup recommends the folowing:
