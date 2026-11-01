@@ -160,7 +160,7 @@ hashcat -a 0 -m 16500 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjEwMjMsInJvb
 ```
 It is however noted that the cracking process requires a valid JWT key so that the correct secret key can be identified. The signing key was weak and therefore hashcat cracked it very fast as captured in the screenshot below.
 <img src="./Screenshots/secret_key.png">
-[A screemshot showing hashcat cracking JWT signing key](./Screenshots/secret_key.png)<br>
+[A screenshot showing hashcat cracking JWT signing key](./Screenshots/secret_key.png)<br>
 It is evident that the JWT secret signing key is ```secret123``` which will be used in the next step to craft an admin token to access ```/api/admin``` route.
 The JWT in this lab activity was generated using a python code below.
 
@@ -243,4 +243,33 @@ Navigating to `/vault.php` gives the response as shown in the screenshot below.
 
 The flag is displayed as `ICDFA{xss_4dd999}`.
 
+## Severty Rating
+Based on how easy/hard it was to exploit these vulnerabilities, the vulnerabilities are scored as shown in the table below.
+
+|Vulnerability|Severity|Reason|
+|---|---|---|
+|IDOR|**High**|Allows authenticated users to access any record without proper checks just by changing the account identifier only.|
+|JWT Manipulation|**Critical**|Allows an attacker to easily escalate the privilege to a higher level account. eg. the admin|
+|Stored XSS|**High**|Leads to accounts compromise as indicated earlier|
+|Unrestricted File Upload|**Critical**|Allows an attacker to achieve RCE which might lead to a complete infrastructure takeover|
+|
+
+## Business Implications of the Vulnerabilities
+These are the consequences faced bythe victim after these vulnerabilities have been exploited. These implications range from loss of clients trust to a total business closure. In this case, the business implications of these vulnerabilites can be summarized in the table below.
+|Vulnerability|Implication|
+|---|---|
+|IDOR|Leads to privacy violations as users will often access other users data leading to privacy violations which may lead to multi disciplinary law suits|
+|JWT Manipulation| Exposes sensitive administrative interfaces leading to unauthorised malicious actions performed by attackers for their own gain. This leads to business loss in early stages|
+|Stored XSS|This leads to access to privileged accounts leading to unauthorised administrative activities|
+|Unrestricted File Uploads| Leads to RCE leading to customer data exposure, financial losses and even reputational damage|
+|
+
 ## Recommendations
+This writeup presents the ways in which the above identified and exploited vulnerabilities can be avoided and protect the web application. This writeup recommends the folowing:
+- Verify any request where the records accessed are tied to a user fed input to determine whether the user has rights to access the resource.
+- Enforce secure JWT verification policies incluidng strong signing keys so that they can not be easily cracked by a malicious user.
+- Always escape user input before storing it to the database and also before displaying it to the user.
+- Use strict file validation techniques or libraries that ensure the file checking techniques are not bypassed by double extensions or appending null bytes to file names as seen earlier.
+
+## Conclusion
+This lab activity successfully and comprehensively a penetration test on the **FAMJIS** bank application where four major web application vulnerabilites were exploited. This writeup also presented the findings, the business implications together with the vulnerability severity so that businesses can make informed decisions by clearly understanding the impacts of any vulnerability exploited by a malicious user. Addressing these vulnerabilities significantly increase the security posture of an institution therefore making them protect users data, prevent downtimes and reduce the risks of unauthorised access.
